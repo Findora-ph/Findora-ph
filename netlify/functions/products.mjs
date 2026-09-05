@@ -103,9 +103,7 @@ const reply = (data, status = 200) =>
   });
 
 async function getProducts(store) {
-  let products = await store.get("products", {
-    type: "json"
-  });
+  let products = await store.get("products", { type: "json" });
 
   if (!Array.isArray(products)) {
     products = SEED;
@@ -115,6 +113,15 @@ async function getProducts(store) {
   return products;
 }
 
+function isAuthorized(request) {
+  const password = request.headers.get("x-admin-password") || "";
+
+  return (
+    Boolean(process.env.ADMIN_PASSWORD) &&
+    password === process.env.ADMIN_PASSWORD
+  );
+}
+
 export default async (request) => {
   try {
     const store = getStore("findora-products");
@@ -122,69 +129,72 @@ export default async (request) => {
 
     if (method === "GET") {
       const products = await getProducts(store);
-      return reply(products);
+      return reply({ products });
     }
 
-    if (method !== "POST") {
-      return reply({ error: "Method not allowed" }, 405);
-    }
-
-    const body = await request.json();
-
-    if (
-      !process.env.ADMIN_PASSWORD ||
-      body.password !== process.env.ADMIN_PASSWORD
-    ) {
+    if (!isAuthorized(request)) {
       return reply({ error: "Unauthorized" }, 401);
     }
 
-    const action = body.action;
     let products = await getProducts(store);
 
-    if (action === "add") {
-      if (!body.product?.name) {
+    if (method === "POST") {
+      const body = await request.json();
+
+      if (!body?.name) {
         return reply({ error: "Product name is required" }, 400);
       }
 
       const product = {
-        id: String(body.product.id || Date.now()),
-        name: String(body.product.name),
-        price: String(body.product.price || ""),
-        category: String(body.product.category || "Others"),
-        emoji: String(body.product.emoji || "🛍️"),
-        description: String(body.product.description || ""),
-        link: String(body.product.link || "")
+        id: String(body.id || Date.now()),
+        name: String(body.name),
+        price: String(body.price || ""),
+        category: String(body.category || "Others"),
+        emoji: String(body.emoji || "🛍️"),
+        description: String(body.description || ""),
+        link: String(body.link || "")
       };
 
-      products.push(product);
-    } else if (action === "update") {
       const index = products.findIndex(
-        (product) => String(product.id) === String(body.product?.id)
+        (item) => String(item.id) === String(product.id)
       );
 
-      if (index === -1) {
-        return reply({ error: "Product not found" }, 404);
+      if (index >= 0) {
+        products[index] = product;
+      } else {
+        products.push(product);
       }
 
-      products[index] = {
-        ...products[index],
-        ...body.product,
-        id: products[index].id
-      };
-    } else if (action === "delete") {
-      products = products.filter(
-        (product) => String(product.id) !== String(body.id)
+      products.sort((a, b) =>
+        String(a.id).localeCompare(String(b.id), undefined, {
+          numeric: true
+        })
       );
-    } else {
-      return reply({ error: "Invalid action" }, 400);
+
+      await store.setJSON("products", products);
+
+      return reply({
+        success: true,
+        products
+      });
     }
 
-    await store.setJSON("products", products);
+    if (method === "DELETE") {
+      const body = await request.json();
 
-    return reply({
-      success: true,
-      products
-    });
+      products = products.filter(
+        (item) => String(item.id) !== String(body.id)
+      );
+
+      await store.setJSON("products", products);
+
+      return reply({
+        success: true,
+        products
+      });
+    }
+
+    return reply({ error: "Method not allowed" }, 405);
   } catch (error) {
     console.error(error);
 
