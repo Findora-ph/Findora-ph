@@ -153,6 +153,7 @@ export default async (request) => {
         emoji: String(body.emoji || "🛍️"),
         description: String(body.description || ""),
         link: String(body.link || "")
+        image: String(body.image || "")
       };
 
       const index = products.findIndex(
