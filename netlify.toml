@@ -4,3 +4,8 @@ functions="netlify/functions"
 
 [functions]
 node_bundler="esbuild"
+
+[[redirects]]
+from = "/api/products"
+to = "/.netlify/functions/products"
+status = 200
