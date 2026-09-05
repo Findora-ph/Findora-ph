@@ -1,15 +1,638 @@
-<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Findora PH Admin</title>
-<style>body{margin:0;background:#f5eee6;font-family:Arial;color:#2d2723}.wrap{max-width:760px;margin:auto;padding:16px}.panel{background:#fffaf5;border:1px solid #e7d8ca;border-radius:22px;padding:20px;margin-bottom:14px}h1,h2{font-family:Georgia}label{display:block;font-size:12px;font-weight:700;margin:12px 0 5px}input,textarea,select{width:100%;padding:12px;border:1px solid #e7d8ca;border-radius:12px;box-sizing:border-box}textarea{min-height:80px}.row{display:grid;grid-template-columns:1fr 1fr;gap:10px}.btn{border:0;border-radius:12px;padding:12px 14px;font-weight:800}.primary{background:#8b6b4e;color:#fff}.danger{background:#fee8e5;color:#8d332b}.item{border-top:1px solid #e7d8ca;padding:12px 0;display:flex;justify-content:space-between;gap:10px}.status{margin-top:10px;padding:10px;border-radius:10px;display:none}@media(max-width:600px){.row{grid-template-columns:1fr}}</style></head>
-<body><div class="wrap"><div class="panel"><h1>Findora PH Admin</h1><p>Add a product here and it will appear automatically on the public website.</p></div>
-<div class="panel"><h2>Admin Access</h2><label>Password</label><input id="password" type="password"></div>
-<div class="panel"><h2>Add / Update Find</h2><div class="row"><div><label>Find Number</label><input id="id" placeholder="011"></div><div><label>Emoji</label><input id="emoji" placeholder="✨"></div></div>
-<label>Product Name</label><input id="name"><div class="row"><div><label>Price</label><input id="price"></div><div><label>Category</label><select id="category"><option>Tech</option><option>Home</option><option>Kitchen</option><option>Fashion</option><option>Travel</option><option>Lifestyle</option><option>School</option><option>Other</option></select></div></div>
-<label>Description</label><textarea id="description"></textarea><label>Shopee Affiliate Link</label><input id="link"><label>Product Image URL (optional)</label><input id="image">
-<p><button id="save" class="btn primary">Publish Product</button></p><div id="status" class="status"></div></div><div class="panel"><h2>Current Products</h2><div id="list">Loading...</div></div></div>
-<script>
-const $=x=>document.getElementById(x),fields=['id','emoji','name','price','category','description','link','image'];
-function show(m,ok=true){$('status').style.display='block';$('status').style.background=ok?'#e8f5eb':'#fee8e5';$('status').textContent=m}
-async function load(){let r=await fetch('/api/products',{cache:'no-store'}),d=await r.json(),ps=d.products||[];$('list').innerHTML=ps.sort((a,b)=>Number(b.id)-Number(a.id)).map(p=>`<div class="item"><div><b>#${p.id} — ${p.name}</b><br><small>${p.price}</small></div><button class="btn danger" onclick="del('${p.id}')">Delete</button></div>`).join('')}
-$('save').onclick=async()=>{let p={};fields.forEach(x=>p[x]=$(x).value.trim());if(!p.id||!p.name||!p.link)return show('Find number, name, and Shopee link are required.',false);let r=await fetch('/api/products',{method:'POST',headers:{'content-type':'application/json','x-admin-password':$('password').value},body:JSON.stringify(p)}),d=await r.json();if(!r.ok)return show(d.error||'Save failed',false);show('Published successfully!');load()}
-async function del(id){if(!confirm('Delete Find #'+id+'?'))return;let r=await fetch('/api/products',{method:'DELETE',headers:{'content-type':'application/json','x-admin-password':$('password').value},body:JSON.stringify({id})}),d=await r.json();if(!r.ok)return show(d.error||'Delete failed',false);show('Deleted.');load()}load();
-</script></body></html>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Findora PH Admin</title>
+
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      font-family: Arial, sans-serif;
+      background: #f5efe6;
+      color: #2c2c2c;
+    }
+
+    .container {
+      max-width: 900px;
+      margin: auto;
+      padding: 18px;
+    }
+
+    h1 {
+      margin-bottom: 4px;
+    }
+
+    .subtitle {
+      color: #7a695a;
+      margin-bottom: 20px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 18px;
+      padding: 18px;
+      margin-bottom: 18px;
+      box-shadow: 0 5px 20px rgba(0,0,0,.06);
+    }
+
+    label {
+      display: block;
+      font-weight: bold;
+      margin-top: 12px;
+      margin-bottom: 6px;
+    }
+
+    input,
+    textarea,
+    select {
+      width: 100%;
+      padding: 13px;
+      border: 1px solid #d8cec4;
+      border-radius: 12px;
+      font-size: 16px;
+      background: #fff;
+    }
+
+    textarea {
+      min-height: 90px;
+      resize: vertical;
+    }
+
+    button {
+      border: none;
+      border-radius: 12px;
+      padding: 13px 18px;
+      font-size: 15px;
+      cursor: pointer;
+      font-weight: bold;
+    }
+
+    .primary {
+      width: 100%;
+      background: #8b6b4e;
+      color: white;
+      margin-top: 16px;
+    }
+
+    .secondary {
+      background: #eee6de;
+      color: #55483e;
+    }
+
+    .danger {
+      background: #f6dddd;
+      color: #8c2727;
+    }
+
+    .status {
+      margin-top: 12px;
+      padding: 12px;
+      border-radius: 12px;
+      display: none;
+    }
+
+    .success {
+      display: block;
+      background: #e4f3e7;
+      color: #286538;
+    }
+
+    .error {
+      display: block;
+      background: #f9dddd;
+      color: #8b2222;
+    }
+
+    .preview {
+      background: #faf7f3;
+      border: 1px solid #eadfd5;
+      border-radius: 16px;
+      padding: 16px;
+      margin-top: 14px;
+    }
+
+    .preview-emoji {
+      font-size: 40px;
+    }
+
+    .preview h3 {
+      margin: 8px 0 5px;
+    }
+
+    .preview-price {
+      font-weight: bold;
+      color: #8b6b4e;
+    }
+
+    .products {
+      display: grid;
+      gap: 12px;
+    }
+
+    .product-row {
+      border: 1px solid #eadfd5;
+      border-radius: 14px;
+      padding: 14px;
+    }
+
+    .product-top {
+      display: flex;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .product-emoji {
+      font-size: 30px;
+    }
+
+    .product-name {
+      font-weight: bold;
+    }
+
+    .product-meta {
+      font-size: 13px;
+      color: #777;
+      margin-top: 3px;
+    }
+
+    .actions {
+      display: flex;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .actions button {
+      flex: 1;
+    }
+
+    .section-title {
+      margin-bottom: 10px;
+    }
+
+    .small {
+      font-size: 13px;
+      color: #806f61;
+    }
+
+    @media (min-width: 700px) {
+      .grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 12px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="container">
+    <h1>Findora PH Admin 🛒</h1>
+    <div class="subtitle">Good Finds. Better Choices.</div>
+
+    <div class="card">
+      <h2 class="section-title">Add / Edit Product</h2>
+
+      <label>Admin Password</label>
+      <input
+        id="password"
+        type="password"
+        placeholder="Enter admin password"
+      />
+
+      <div class="grid">
+        <div>
+          <label>Find Number</label>
+          <input id="id" type="text" readonly />
+        </div>
+
+        <div>
+          <label>Emoji</label>
+          <input id="emoji" type="text" value="🛍️" />
+        </div>
+      </div>
+
+      <label>Product Name</label>
+      <input
+        id="name"
+        type="text"
+        placeholder="Example: Automatic UV Umbrella"
+      />
+
+      <div class="grid">
+        <div>
+          <label>Price</label>
+          <input
+            id="price"
+            type="text"
+            placeholder="Example: ₱99"
+          />
+        </div>
+
+        <div>
+          <label>Category</label>
+          <select id="category">
+            <option>Tech</option>
+            <option>Home</option>
+            <option>Fashion</option>
+            <option>Travel</option>
+            <option>Kitchen</option>
+            <option>Lifestyle</option>
+            <option>School</option>
+            <option>Others</option>
+          </select>
+        </div>
+      </div>
+
+      <label>Description</label>
+      <textarea
+        id="description"
+        placeholder="Short product description..."
+      ></textarea>
+
+      <label>Shopee Affiliate Link</label>
+      <input
+        id="link"
+        type="url"
+        placeholder="https://s.shopee.ph/..."
+      />
+
+      <div class="preview">
+        <div class="small">Live Preview</div>
+        <div id="previewEmoji" class="preview-emoji">🛍️</div>
+        <h3 id="previewName">Product Name</h3>
+        <div id="previewPrice" class="preview-price">Price</div>
+        <p id="previewDescription">
+          Product description will appear here.
+        </p>
+      </div>
+
+      <button id="saveBtn" class="primary">
+        Publish Product
+      </button>
+
+      <div id="status" class="status"></div>
+    </div>
+
+    <div class="card">
+      <h2 class="section-title">Existing Products</h2>
+      <div class="small">
+        Tap Edit to update a product or Delete to remove it.
+      </div>
+
+      <div
+        id="products"
+        class="products"
+        style="margin-top:14px"
+      ></div>
+    </div>
+  </div>
+
+  <script>
+    let products = [];
+    let editingId = null;
+
+    const $ = (id) => document.getElementById(id);
+
+    async function loadProducts() {
+      try {
+        const response = await fetch("/api/products", {
+          cache: "no-store"
+        });
+
+        const data = await response.json();
+
+        products = Array.isArray(data.products)
+          ? data.products
+          : [];
+
+        renderProducts();
+        setNextNumber();
+      } catch (error) {
+        showStatus(
+          "Unable to load products.",
+          "error"
+        );
+      }
+    }
+
+    function setNextNumber() {
+      if (editingId) return;
+
+      const numericIds = products
+        .map(product => parseInt(product.id, 10))
+        .filter(number => !isNaN(number));
+
+      const next =
+        numericIds.length
+          ? Math.max(...numericIds) + 1
+          : 1;
+
+      $("id").value =
+        String(next).padStart(3, "0");
+    }
+
+    function updatePreview() {
+      $("previewEmoji").textContent =
+        $("emoji").value || "🛍️";
+
+      $("previewName").textContent =
+        $("name").value || "Product Name";
+
+      $("previewPrice").textContent =
+        $("price").value || "Price";
+
+      $("previewDescription").textContent =
+        $("description").value ||
+        "Product description will appear here.";
+    }
+
+    ["emoji", "name", "price", "description"]
+      .forEach(id => {
+        $(id).addEventListener(
+          "input",
+          updatePreview
+        );
+      });
+
+    function renderProducts() {
+      const container = $("products");
+      container.innerHTML = "";
+
+      const sorted = [...products].sort(
+        (a, b) =>
+          Number(b.id) - Number(a.id)
+      );
+
+      sorted.forEach(product => {
+        const row = document.createElement("div");
+        row.className = "product-row";
+
+        row.innerHTML = `
+          <div class="product-top">
+            <div class="product-emoji">
+              ${product.emoji || "🛍️"}
+            </div>
+
+            <div>
+              <div class="product-name">
+                #${product.id} ${product.name}
+              </div>
+
+              <div class="product-meta">
+                ${product.category || "Others"}
+                •
+                ${product.price || ""}
+              </div>
+            </div>
+          </div>
+
+          <div class="actions">
+            <button
+              class="secondary"
+              onclick="editProduct('${product.id}')"
+            >
+              Edit
+            </button>
+
+            <button
+              class="danger"
+              onclick="deleteProduct('${product.id}')"
+            >
+              Delete
+            </button>
+          </div>
+        `;
+
+        container.appendChild(row);
+      });
+    }
+
+    function editProduct(id) {
+      const product = products.find(
+        item => String(item.id) === String(id)
+      );
+
+      if (!product) return;
+
+      editingId = product.id;
+
+      $("id").value = product.id;
+      $("emoji").value = product.emoji || "";
+      $("name").value = product.name || "";
+      $("price").value = product.price || "";
+      $("category").value =
+        product.category || "Others";
+      $("description").value =
+        product.description || "";
+      $("link").value = product.link || "";
+
+      $("saveBtn").textContent =
+        "Update Product";
+
+      updatePreview();
+
+      window.scrollTo({
+        top: 0,
+        behavior: "smooth"
+      });
+    }
+
+    function clearForm() {
+      editingId = null;
+
+      $("emoji").value = "🛍️";
+      $("name").value = "";
+      $("price").value = "";
+      $("category").value = "Tech";
+      $("description").value = "";
+      $("link").value = "";
+
+      $("saveBtn").textContent =
+        "Publish Product";
+
+      updatePreview();
+      setNextNumber();
+    }
+
+    async function saveProduct() {
+      const password =
+        $("password").value.trim();
+
+      if (!password) {
+        showStatus(
+          "Enter your admin password.",
+          "error"
+        );
+        return;
+      }
+
+      const product = {
+        id: $("id").value.trim(),
+        emoji: $("emoji").value.trim(),
+        name: $("name").value.trim(),
+        price: $("price").value.trim(),
+        category: $("category").value,
+        description:
+          $("description").value.trim(),
+        link: $("link").value.trim()
+      };
+
+      if (!product.name) {
+        showStatus(
+          "Product name is required.",
+          "error"
+        );
+        return;
+      }
+
+      $("saveBtn").disabled = true;
+      $("saveBtn").textContent =
+        editingId
+          ? "Updating..."
+          : "Publishing...";
+
+      try {
+        const response = await fetch(
+          "/api/products",
+          {
+            method: "POST",
+            headers: {
+              "content-type":
+                "application/json",
+              "x-admin-password":
+                password
+            },
+            body: JSON.stringify(product)
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Publish failed"
+          );
+        }
+
+        products = data.products || [];
+
+        const savedId = product.id;
+
+        renderProducts();
+        clearForm();
+
+        showStatus(
+          `✓ Find #${savedId} published successfully!`,
+          "success"
+        );
+      } catch (error) {
+        showStatus(
+          error.message,
+          "error"
+        );
+      } finally {
+        $("saveBtn").disabled = false;
+
+        if (!editingId) {
+          $("saveBtn").textContent =
+            "Publish Product";
+        }
+      }
+    }
+
+    async function deleteProduct(id) {
+      const password =
+        $("password").value.trim();
+
+      if (!password) {
+        showStatus(
+          "Enter your admin password first.",
+          "error"
+        );
+        return;
+      }
+
+      const product = products.find(
+        item => String(item.id) === String(id)
+      );
+
+      const confirmed = confirm(
+        `Delete #${id} ${product?.name || ""}?`
+      );
+
+      if (!confirmed) return;
+
+      try {
+        const response = await fetch(
+          "/api/products",
+          {
+            method: "DELETE",
+            headers: {
+              "content-type":
+                "application/json",
+              "x-admin-password":
+                password
+            },
+            body: JSON.stringify({ id })
+          }
+        );
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(
+            data.error || "Delete failed"
+          );
+        }
+
+        products = data.products || [];
+        renderProducts();
+
+        if (
+          editingId &&
+          String(editingId) === String(id)
+        ) {
+          clearForm();
+        } else {
+          setNextNumber();
+        }
+
+        showStatus(
+          `✓ Find #${id} deleted.`,
+          "success"
+        );
+      } catch (error) {
+        showStatus(
+          error.message,
+          "error"
+        );
+      }
+    }
+
+    function showStatus(message, type) {
+      const status = $("status");
+
+      status.textContent = message;
+      status.className =
+        `status ${type}`;
+
+      setTimeout(() => {
+        status.className = "status";
+      }, 5000);
+    }
+
+    $("saveBtn").addEventListener(
+      "click",
+      saveProduct
+    );
+
+    updatePreview();
+    loadProducts();
+  </script>
+</body>
+</html>
