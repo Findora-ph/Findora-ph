@@ -152,7 +152,7 @@ export default async (request) => {
         category: String(body.category || "Others"),
         emoji: String(body.emoji || "🛍️"),
         description: String(body.description || ""),
-        link: String(body.link || "")
+        link: String(body.link || ""),
         image: String(body.image || "")
       };
 
